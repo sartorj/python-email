@@ -9,7 +9,7 @@ def process_command(mail):
         mail.logout()
         raise SystemExit
     elif user_input == 'help' or user_input == 'ls' :
-        print "Command list: " + "\n'quit' or 'q' - exits" + "\n'one' - reads first email\nread <num> - read email with id <num>\nunread - view unread emails"
+        print print_help()
     elif user_input == 'all':
         get_all(mail)
     elif user_input == 'unread':
@@ -18,8 +18,27 @@ def process_command(mail):
         view_all(mail)
     elif re.match('^read\s[0-9]$',user_input):
         read_id(mail,user_input)
+    elif re.match('^mark\sunread\s[0-9]$',user_input):
+        mark_unread(mail,user_input)
     else:
         print "Command not recognized.\n Type 'help' for list of commands."
+        
+    return
+
+def print_help():
+    help_text = "Command list: " + "\n'quit' or 'q' - exits" 
+    help_text += "\n'one' - reads first email\nread <num> - read email with id <num>\nunread - view unread emails"
+    return help_text
+
+def mark_unread(mail,user_input):
+    clear_id = user_input.strip('mark unread ')
+    print "clearing message " + str(clear_id)
+    try:
+        mail.store(clear_id,'-FLAGS','\SEEN')
+    except:
+        #can reach if id is not valid - ex: 0
+        print "Error marking message as unread"
+    return
 
 def unread(mail):
     typ,unread_ids = mail.search(None,'(UNSEEN)')
@@ -28,22 +47,31 @@ def unread(mail):
         typ, data = mail.fetch(id,'(BODY.PEEK[HEADER])') #peek does not mark email as read
         raw_email = data[0][1]
         email_message = email.message_from_string(raw_email)
-        print "ID: " + str(id) + " -- From: " + email_message['From'] + " " + email_message
+        print "ID: " + str(id) + " ++ From: " + email_message['From'] + " " + email_message['Date']
+    return
 
 def view_all(mail):
     typ, data = mail.search(None, 'ALL')
+    typ_unread, unread_ids = mail.search(None,'(UNSEEN)')
     for id in reversed(data[0].split()):
         typ, data = mail.fetch(id, '(BODY.PEEK[HEADER])')
         raw_email = data[0][1]
         email_message = email.message_from_string(raw_email)
-        print "ID: " + str(id) + " -- From: " + email_message['From']
+        if id in unread_ids[0].split():
+            #unread
+            print "ID: " + str(id) + " ++ From: " + email_message['From'] + email_message['Date'] 
+        else:
+            #read
+            print "ID: " + str(id) + " -- From: " + email_message['From'] + email_message['Date'] 
+    return
 
 def login():    
     mail = imaplib.IMAP4_SSL('imap.gmail.com')
     email_address = raw_input("Email address: ") # prompt user for email address
+
     try:
         mail.login(email_address,getpass.getpass()) #prompt for password and then attempt login
-    except:
+     except:
         print "An error has occured during login"
         raise SystemExit
 
@@ -53,10 +81,13 @@ def login():
     print "\nYou have " + str(len(unread_ids[0].split())) + " unread messages"
     return mail
 
+
+    
 def main():
     mail_obj = login() #login returns mail_obj which is then passed to process loop
     while True:
         process_command(mail_obj)
+
 
 def read_id(mail,user_input):
     #remove read and whitespace from user_input
@@ -73,7 +104,11 @@ def read_id(mail,user_input):
             if part.get_content_type() == 'text/plain':
                 message = part.get_payload(decode=True)
                 print "Body: " + message
-        
+    else:
+        #not reading some emails
+        pass
+    return
+
 def get_all(mail):
     mail.list()
     mail.select("inbox")
@@ -92,7 +127,8 @@ def get_all(mail):
                 if part.get_content_type() == 'text/plain':
                     message = part.get_payload(decode=True)
                     print "Body: " + message
-                    
+    return
+
 def get_one(mail):
     mail.list()
     mail.select("inbox")
@@ -111,6 +147,7 @@ def get_one(mail):
             if part.get_content_type() == 'text/plain':
                 message = part.get_payload(decode=True)
                 print "Body: " + message
+    return
 
 if __name__ == '__main__':
     main()
